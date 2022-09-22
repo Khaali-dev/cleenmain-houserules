@@ -98,10 +98,11 @@ export default class CemBaseItem extends Item {
      * @param {*} multipleattacks Number of Multiple Attacks boon
      * @returns 
      */
-     calculateWeaponDamage(actor, dices, useHeroism, lethalattack, minorinjury, multipleattacks) {
+     calculateWeaponDamage(actor, dices, useHeroism, lethalattack, minorinjury, multipleattacks, badShapeDamageBonus) {
         if (this.type !== "weapon") return;
 
         const nbDamageDices= this.getSystemData('damageBase').match(/([0-9])d6/) ? parseInt(this.getSystemData('damageBase').match(/([0-9])d6/)[1]) : 0;
+        const baseBonusDamage= this.getSystemData('damageBase').match(/d6[ ]?\+[ ]?([0-9])/) ? parseInt(this.getSystemData('damageBase').match(/d6[ ]?\+[ ]?([0-9])/)[1]) : 0;
         let damageFormula = null;
         let damage = 0;
         let nbSix = 0;
@@ -144,7 +145,8 @@ export default class CemBaseItem extends Item {
 
         // Damage formula and bonus for player
         if (actor.type === "player") {
-            damageFormula = nbDamageDices + "d6";
+            damageFormula = this.getSystemData('damageBase');
+            damage += baseBonusDamage;
             if (this.getSystemData('range') > 0) {
                 damageFormula += " + " + parseInt(actor.system.damageBonus.ranged);
                 damage += parseInt(actor.system.damageBonus.ranged);
@@ -158,7 +160,7 @@ export default class CemBaseItem extends Item {
                 damageFormula += " + 1d6";
                 damage += dices[3].result;
                 damageToolTipInfos.push(...Rolls.createDamageToolTip("heroism", 1, dices.slice(3)));
-            }            
+            }
         }
 
         // Explosive weapon (6+)
@@ -195,6 +197,25 @@ export default class CemBaseItem extends Item {
             damageToolTipInfos.push(...Rolls.createDamageToolTip("lethalattack", lethalRoll.dice[0].results.length, lethalDices));
             damage += lethalRoll._total;
             rolls.push(lethalRoll);
+        }
+        //bad shape damage bonus from boon
+        if(badShapeDamageBonus){
+            let badShapeFormula = badShapeDamageBonus + "[black]";
+            if (this.getSystemData('sixPlus')) {
+                damageFormula += " + " + badShapeDamageBonus + "x";
+                badShapeFormula = badShapeDamageBonus + "x[black]";
+            } else {
+                damageFormula += " + " + badShapeDamageBonus;
+            }
+            const badShapeRoll = new Roll(badShapeFormula, {}).roll({ async: false });
+            let badShapeDices = [];
+            for (let index = 0; index < badShapeRoll.dice.length; index++) {
+                const dice = badShapeRoll.dice[index];
+                badShapeDices.push(...dice.results);
+            }
+            damageToolTipInfos.push(...Rolls.createDamageToolTip("badshapedamage", badShapeRoll.dice[0].results.length, badShapeDices));
+            damage += badShapeRoll._total;
+            rolls.push(badShapeRoll);
         }
         
         // Minor injury penalty
